@@ -38,7 +38,7 @@ Five terms. Five forces. Six emotional chambers. Velocity operators. Seasonal mo
 | Term | Name | What It Does |
 |------|------|-------------|
 | **B** | Sequential Chain | Inertia. What was said pulls what comes next. |
-| **H** | Hebbian Resonance | Memory. Co-occurring words strengthen each other. |
+| **H** | Hebbian Resonance | Memory. Co-occurring words strengthen each other. Learnable positional profile (36 Hebbian params) replaces fixed decay. |
 | **F** | Prophecy Fulfillment | Will. Unfulfilled predictions create generation pressure. |
 | **A** | Destiny Attraction | Direction. The conversation has mass and pulls toward it. |
 | **T** | Trauma Gravity | Wound. Origin words surface when the field is hurt. |

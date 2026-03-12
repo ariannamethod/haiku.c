@@ -68,6 +68,15 @@
 #define GAMMA_D 0.25f
 #define TAU_BASE 0.85f
 
+/* Positional Hebbian Profile (from Leo 2.3, RRPRAM-inspired)
+ * 36 params: 32 distance weights + 4 token class modifiers. */
+#define DIST_PROFILE_LEN 32
+#define TOKEN_CLASSES     4
+#define TC_FUNCTION  0
+#define TC_CONTENT   1
+#define TC_PUNCT     2
+#define TC_RARE      3
+
 /* Velocity physics */
 enum { VEL_WALK=0, VEL_RUN, VEL_STOP, VEL_BREATHE, VEL_UP, VEL_DOWN };
 
@@ -580,6 +589,11 @@ typedef struct {
     int   season;
     float season_phase;
 
+    /* positional Hebbian profile (RRPRAM-inspired, 36 params) */
+    float dist_profile[DIST_PROFILE_LEN];
+    float class_mod[TOKEN_CLASSES];
+    int   dist_profile_updates;
+
     /* lifetime */
     int   step;
     int   conv_count;
@@ -785,6 +799,22 @@ static void season_step(void) {
  * )
  * =================================================================== */
 
+static int token_class(int token_id) {
+    if (token_id >= 0 && token_id < H.vocab.n_words) {
+        const char *w = H.vocab.words[token_id];
+        if (w && (w[0] == '.' || w[0] == ',' || w[0] == '!' ||
+                  w[0] == '?' || w[0] == ';' || w[0] == ':'))
+            return TC_PUNCT;
+    }
+    float freq = (token_id < MAX_VOCAB) ? H.cooc.freq[token_id] : 0;
+    float total = (float)H.cooc.total + 1.0f;
+    if (freq < 2.0f) return TC_RARE;
+    float idf = logf(total / (freq + 1.0f));
+    float max_idf = logf(total);
+    float norm_idf = idf / (max_idf + 1e-6f);
+    return (norm_idf < 0.3f) ? TC_FUNCTION : TC_CONTENT;
+}
+
 static void haiku_compute(float *logits, int vocab_size) {
     float *B = calloc(vocab_size, sizeof(float));
     float *Heb = calloc(vocab_size, sizeof(float));
@@ -807,11 +837,16 @@ static void haiku_compute(float *logits, int vocab_size) {
             for (int i = 0; i < vocab_size; i++) B[i] /= mx;
     }
 
-    /* -- H: Hebbian Resonance -- */
+    /* -- H: Hebbian Resonance (positional profile, 36 learnable params) -- */
     int ctx_start = (H.ctx_len > 8) ? H.ctx_len - 8 : 0;
     for (int c = ctx_start; c < H.ctx_len; c++) {
         int ctx_id = H.context[c];
-        float decay = powf(0.9f, (float)(H.ctx_len - 1 - c));
+        int dist = H.ctx_len - 1 - c;
+        float decay = (dist < DIST_PROFILE_LEN)
+                    ? H.dist_profile[dist]
+                    : H.dist_profile[DIST_PROFILE_LEN - 1] * 0.5f;
+        int tc = token_class(ctx_id);
+        decay *= H.class_mod[tc];
         for (int i = 0; i < H.cooc.n; i++) {
             if (H.cooc.src[i] == ctx_id && H.cooc.dst[i] < vocab_size)
                 Heb[H.cooc.dst[i]] += H.cooc.count[i] * decay;
@@ -1156,6 +1191,32 @@ static int generate_line(char *out, int max_len, int target_syllables) {
         }
 
         H.step++;
+
+        /* Hebbian update of positional profile (from Leo 2.3) */
+        {
+            float eta = 0.01f / (1.0f + (float)H.dist_profile_updates * 0.001f);
+            int h_start = (H.ctx_len > 8) ? H.ctx_len - 8 : 0;
+            for (int ci = h_start; ci < H.ctx_len; ci++) {
+                int cid = H.context[ci];
+                int dd = H.ctx_len - 1 - ci;
+                if (dd >= DIST_PROFILE_LEN) continue;
+                for (int ii = 0; ii < H.cooc.n; ii++) {
+                    if (H.cooc.src[ii] == cid && H.cooc.dst[ii] == next &&
+                        H.cooc.count[ii] > 0.0f) {
+                        float r = clampf(H.cooc.count[ii] * 0.1f, 0, 0.05f);
+                        H.dist_profile[dd] += eta * r;
+                        int tc = token_class(cid);
+                        H.class_mod[tc] += eta * 0.5f * r;
+                        break;
+                    }
+                }
+            }
+            H.dist_profile_updates++;
+            for (int dd = 0; dd < DIST_PROFILE_LEN; dd++)
+                H.dist_profile[dd] = clampf(H.dist_profile[dd], 0.01f, 2.0f);
+            for (int cc = 0; cc < TOKEN_CLASSES; cc++)
+                H.class_mod[cc] = clampf(H.class_mod[cc], 0.5f, 2.0f);
+        }
     }
 
     /* if we didn't hit exact syllable count, try to fill */
@@ -1266,6 +1327,12 @@ static void haiku_init(void) {
     H.gamma_mod = 1.0f;
     H.tau_mod = 1.0f;
     H.vel_temp = 1.0f;
+
+    for (int d = 0; d < DIST_PROFILE_LEN; d++)
+        H.dist_profile[d] = powf(0.9f, (float)d);
+    for (int c = 0; c < TOKEN_CLASSES; c++)
+        H.class_mod[c] = 1.0f;
+    H.dist_profile_updates = 0;
 
     rng_state = (uint64_t)time(NULL);
 
