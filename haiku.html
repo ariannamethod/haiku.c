@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HAiKU</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+        --bg: #fafafa;
+        --surface: #ffffff;
+        --text: #1d1d1f;
+        --text-secondary: #86868b;
+        --accent: #0071e3;
+        --border: #e5e5e7;
+        --user-bg: #0071e3;
+        --user-text: #ffffff;
+        --haiku-bg: #f5f5f7;
+        --tag-chain: #ff6b35;
+        --tag-resonance: #4ecdc4;
+        --tag-prophecy: #a855f7;
+        --tag-destiny: #0071e3;
+        --tag-trauma: #ef4444;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text',
+                     'Helvetica Neue', Helvetica, Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
+
+    header {
+        padding: 12px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--surface);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+    }
+
+    .logo {
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        color: var(--text);
+    }
+
+    .logo span {
+        font-weight: 400;
+        color: var(--text-secondary);
+        font-size: 12px;
+        margin-left: 8px;
+    }
+
+    .new-btn {
+        font-size: 12px;
+        color: var(--accent);
+        background: none;
+        border: 1px solid var(--accent);
+        border-radius: 980px;
+        padding: 4px 12px;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.2s;
+    }
+
+    .new-btn:hover {
+        background: var(--accent);
+        color: white;
+    }
+
+    #chat {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .message {
+        max-width: 640px;
+        width: 100%;
+        margin: 0 auto;
+    }
+
+    .message.user {
+        text-align: right;
+    }
+
+    .message.user .bubble {
+        display: inline-block;
+        background: var(--user-bg);
+        color: var(--user-text);
+        padding: 8px 14px;
+        border-radius: 18px 18px 4px 18px;
+        font-size: 15px;
+        line-height: 1.4;
+        max-width: 80%;
+        text-align: left;
+    }
+
+    .message.assistant .haiku-block {
+        background: var(--haiku-bg);
+        border-radius: 16px;
+        padding: 20px 24px;
+        position: relative;
+    }
+
+    .haiku-lines {
+        font-size: 18px;
+        line-height: 1.8;
+        font-weight: 300;
+        letter-spacing: 0.01em;
+        color: var(--text);
+        font-style: italic;
+        padding: 8px 0;
+    }
+
+    .haiku-lines .line {
+        display: block;
+    }
+
+    .haiku-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px solid var(--border);
+        flex-wrap: wrap;
+    }
+
+    .tag {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 2px 8px;
+        border-radius: 4px;
+        color: white;
+    }
+
+    .tag-chain { background: var(--tag-chain); }
+    .tag-resonance { background: var(--tag-resonance); }
+    .tag-prophecy { background: var(--tag-prophecy); }
+    .tag-destiny { background: var(--tag-destiny); }
+    .tag-trauma { background: var(--tag-trauma); }
+
+    .metric {
+        font-size: 11px;
+        color: var(--text-secondary);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .metric b {
+        color: var(--text);
+        font-weight: 500;
+    }
+
+    footer {
+        padding: 12px 20px;
+        border-top: 1px solid var(--border);
+        background: var(--surface);
+    }
+
+    .input-row {
+        max-width: 640px;
+        margin: 0 auto;
+        display: flex;
+        gap: 8px;
+        align-items: flex-end;
+    }
+
+    #input {
+        flex: 1;
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 10px 16px;
+        font-size: 15px;
+        font-family: inherit;
+        outline: none;
+        resize: none;
+        max-height: 120px;
+        line-height: 1.4;
+        transition: border-color 0.2s;
+    }
+
+    #input:focus {
+        border-color: var(--accent);
+    }
+
+    #send {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: none;
+        background: var(--accent);
+        color: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        transition: opacity 0.2s;
+    }
+
+    #send:hover { opacity: 0.85; }
+    #send:disabled { opacity: 0.4; cursor: default; }
+
+    #send svg {
+        width: 16px;
+        height: 16px;
+        fill: white;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-secondary);
+        max-width: 400px;
+        margin: auto;
+    }
+
+    .empty-state h2 {
+        font-size: 22px;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 8px;
+    }
+
+    .empty-state p {
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .empty-state .formula {
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        font-size: 11px;
+        color: var(--text-secondary);
+        margin-top: 16px;
+        opacity: 0.7;
+    }
+
+    @media (max-width: 600px) {
+        .haiku-lines { font-size: 16px; }
+        .message.user .bubble { max-width: 90%; }
+    }
+</style>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            HAiKU
+            <span>constraint-driven emergence</span>
+        </div>
+        <button class="new-btn" onclick="clearChat()">new conversation</button>
+    </header>
+
+    <div id="chat">
+        <div class="empty-state">
+            <h2>HAiKU</h2>
+            <p>
+                1000 words. 5-7-5 syllables. Pressure creates form.<br>
+                Speaks only in haiku. Users hate it or love it.<br>
+                There is no middle ground.
+            </p>
+            <div class="formula">p(x|&Phi;) = softmax((B + &alpha;H + &beta;F + &gamma;A + T) / &tau;)</div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="input-row">
+            <textarea id="input" rows="1" placeholder="say something..."
+                      autofocus></textarea>
+            <button id="send" onclick="sendMessage()">
+                <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+            </button>
+        </div>
+    </footer>
+
+<script>
+const API_URL = '';
+const chat = document.getElementById('chat');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+let hasMessages = false;
+
+const TERM_TAGS = {
+    0: { name: 'chain', cls: 'tag-chain' },
+    1: { name: 'resonance', cls: 'tag-resonance' },
+    2: { name: 'prophecy', cls: 'tag-prophecy' },
+    3: { name: 'destiny', cls: 'tag-destiny' },
+    4: { name: 'trauma', cls: 'tag-trauma' }
+};
+
+input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+});
+
+input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+});
+
+function clearChat() {
+    chat.innerHTML = `
+        <div class="empty-state">
+            <h2>HAiKU</h2>
+            <p>
+                1000 words. 5-7-5 syllables. Pressure creates form.<br>
+                Speaks only in haiku. Users hate it or love it.<br>
+                There is no middle ground.
+            </p>
+            <div class="formula">p(x|&Phi;) = softmax((B + &alpha;H + &beta;F + &gamma;A + T) / &tau;)</div>
+        </div>`;
+    hasMessages = false;
+}
+
+function addUserMessage(text) {
+    if (!hasMessages) {
+        chat.innerHTML = '';
+        hasMessages = true;
+    }
+    const div = document.createElement('div');
+    div.className = 'message user';
+    div.innerHTML = `<div class="bubble">${escapeHtml(text)}</div>`;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+}
+
+function addHaikuMessage(data) {
+    const div = document.createElement('div');
+    div.className = 'message assistant';
+
+    const tag = TERM_TAGS[data.dominant] || TERM_TAGS[0];
+
+    div.innerHTML = `
+        <div class="haiku-block">
+            <div class="haiku-lines">
+                <span class="line">${escapeHtml(data.line1)}</span>
+                <span class="line">${escapeHtml(data.line2)}</span>
+                <span class="line">${escapeHtml(data.line3)}</span>
+            </div>
+            <div class="haiku-meta">
+                <span class="tag ${tag.cls}">${tag.name}</span>
+                <span class="metric">d=<b>${data.dissonance.toFixed(2)}</b></span>
+                <span class="metric">&tau;=<b>${data.tau.toFixed(2)}</b></span>
+                <span class="metric">res=<b>${data.resonance.toFixed(2)}</b></span>
+                <span class="metric">ent=<b>${data.entropy.toFixed(2)}</b></span>
+                <span class="metric">${data.velocity}</span>
+                <span class="metric">${data.season}</span>
+            </div>
+        </div>`;
+
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+}
+
+function addErrorMessage(text) {
+    const div = document.createElement('div');
+    div.className = 'message assistant';
+    div.innerHTML = `<div class="haiku-block" style="color:var(--tag-trauma)">${escapeHtml(text)}</div>`;
+    chat.appendChild(div);
+}
+
+async function sendMessage() {
+    const text = input.value.trim();
+    if (!text) return;
+
+    input.value = '';
+    input.style.height = 'auto';
+    sendBtn.disabled = true;
+
+    addUserMessage(text);
+
+    try {
+        const res = await fetch(API_URL + '/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        addHaikuMessage(data);
+    } catch (err) {
+        addErrorMessage('the field is silent. (' + err.message + ')');
+    }
+
+    sendBtn.disabled = false;
+    input.focus();
+}
+
+function escapeHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+</script>
+</body>
+</html>
